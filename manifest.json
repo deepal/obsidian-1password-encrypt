@@ -1,0 +1,9 @@
+{
+	"id": "protected-notes",
+	"name": "1password Encrypt",
+	"version": "0.1.0",
+	"minAppVersion": "1.14.5",
+	"description": "Encrypt notes in place and unlock them with secrets stored in 1Password.",
+	"author": "Deepal Jayasekara",
+	"isDesktopOnly": true
+}

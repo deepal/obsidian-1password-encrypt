@@ -1,0 +1,122 @@
+// Requires a disposable Obsidian profile with remote debugging enabled.
+// Never targets a personal vault. All passwords/content below are synthetic.
+import assert from "node:assert/strict";
+import { writeFile } from "node:fs/promises";
+const port = process.env.OBSIDIAN_QA_PORT ?? "9376";
+const pages = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+const target = pages.find((page) => page.type === "page" && page.url.startsWith("app://obsidian.md/"));
+if (!target) throw new Error("No disposable Obsidian page found.");
+const socket = new WebSocket(target.webSocketDebuggerUrl);
+await new Promise((resolve, reject) => { socket.addEventListener("open", resolve, { once: true }); socket.addEventListener("error", reject, { once: true }); });
+let sequence = 0;
+const pending = new Map();
+socket.addEventListener("message", ({ data }) => { const message = JSON.parse(data); if (!message.id) return; const handler = pending.get(message.id); if (!handler) return; pending.delete(message.id); if (message.error) handler.reject(new Error(JSON.stringify(message.error))); else handler.resolve(message.result); });
+async function rpc(method, params = {}) { const id = ++sequence; const promise = new Promise((resolve, reject) => pending.set(id, { resolve, reject })); socket.send(JSON.stringify({ id, method, params })); return promise; }
+async function evaluate(code) {
+	const result = await rpc("Runtime.evaluate", { expression: `(async()=>{${code}})()`, returnByValue: true, awaitPromise: true });
+	if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);
+	return result.result.value;
+}
+async function until(code) { for (let i = 0; i < 100; i++) { if (await evaluate(`return Boolean(${code});`)) return; await new Promise((resolve) => setTimeout(resolve, 100)); } throw new Error(`Timed out: ${code}`); }
+async function click(label) { await until(`[...document.querySelectorAll('.modal button')].some(b=>b.textContent===${JSON.stringify(label)})`); await evaluate(`[...document.querySelectorAll('.modal button')].reverse().find(b=>b.textContent===${JSON.stringify(label)}).click();`); }
+async function unlockLiveNote() {
+	await evaluate("if(!qaPlugin.views('1Password integration.md').some(v=>v.isUnlocked())) void qaPlugin.unlockNote('1Password integration.md');");
+	await until("qaPlugin.views('1Password integration.md').some(v=>v.isUnlocked()) || [...document.querySelectorAll('.modal button')].some(b=>b.textContent==='Unlock with 1Password')");
+	if (!await evaluate("return qaPlugin.views('1Password integration.md').some(v=>v.isUnlocked());")) await click("Unlock with 1Password");
+	await until("qaPlugin.views('1Password integration.md').some(v=>v.isUnlocked())");
+}
+const passed = [];
+function pass(name) { passed.push(name); console.log(`PASS ${name}`); }
+try {
+	assert.match(await evaluate("return app.vault.getName();"), /^Protected Notes QA/);
+	if (process.argv[2] === "eval") { console.log(JSON.stringify(await evaluate(process.argv[3]))); process.exitCode = 0; }
+	else if (process.argv[2] === "live") {
+		await evaluate("globalThis.qaPlugin=app.plugins.plugins['protected-notes'];");
+		await unlockLiveNote();
+		await until("qaPlugin.coordinator.sessions.has('1Password integration.md') && qaPlugin.views('1Password integration.md').some(v=>v.isUnlocked())");
+		pass("real 1Password secret unlocks the native editor");
+		await evaluate("const suffix=require('node:crypto').randomBytes(8).toString('hex');globalThis.qaMarkers={body:'QA_BODY_'+suffix,firstKey:'qa_private_key_'+suffix,firstValue:'QA_VALUE_'+suffix,secondKey:'qa_second_key_'+suffix,secondValue:'QA_SECOND_'+suffix};const v=qaPlugin.views('1Password integration.md')[0];v.editor.setValue('---\\n'+qaMarkers.firstKey+': '+qaMarkers.firstValue+'\\n---\\n# Verified integration\\n\\n'+qaMarkers.body+'\\n\\n| A | B |\\n| --- | --- |\\n| 1 | 2 |\\n');");
+		await until("qaPlugin.coordinator.require('1Password integration.md').text.includes(qaMarkers.body)");
+		await evaluate("const v=qaPlugin.views('1Password integration.md')[0];v.saveFrontmatter({[qaMarkers.firstKey]:qaMarkers.firstValue,[qaMarkers.secondKey]:qaMarkers.secondValue});await v.save();");
+		assert.equal(await evaluate("return qaPlugin.coordinator.require('1Password integration.md').text.includes(qaMarkers.secondValue) && !(await app.vault.read(app.vault.getAbstractFileByPath('1Password integration.md'))).includes(qaMarkers.secondValue);"),true);
+		pass("native in-document properties save through encryption");
+		// Inspect persistence before putting the sentinel into search history.
+		const leaks=await evaluate(`const fs=require('node:fs'),path=require('node:path');const root=app.vault.adapter.getBasePath();const markers=Object.values(qaMarkers);const hits=[];function scan(dir){for(const e of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,e.name);if(e.isDirectory())scan(p);else if(e.isFile()&&fs.statSync(p).size<25000000){const s=fs.readFileSync(p).toString();if(markers.some(m=>s.includes(m)))hits.push(path.relative(root,p));}}}scan(root);return hits;`);
+		assert.deepEqual(leaks,[]);pass("vault and plugin recovery contain no post-encryption plaintext markers");
+		await evaluate("app.internalPlugins.getEnabledPluginById('global-search').openGlobalSearch(qaMarkers.body);");
+		await until("document.querySelector('.search-result-container')");
+		await new Promise((resolve)=>setTimeout(resolve,1000));
+		assert.equal(await evaluate("return document.querySelectorAll('.search-result-file-title').length;"),0);
+		assert.equal(await evaluate("return qaPlugin.coordinator.sessions.has('1Password integration.md');"),true);
+		pass("global content search does not find unlocked note contents");
+		await evaluate("await qaPlugin.lockNote('1Password integration.md');qaPlugin.settings={account:'',secretRef:''};await qaPlugin.saveData(qaPlugin.settings);await app.plugins.disablePlugin('protected-notes');await app.plugins.enablePlugin('protected-notes');globalThis.qaPlugin=app.plugins.plugins['protected-notes'];");
+		await until("qaPlugin.views('1Password integration.md').length>0");
+		await unlockLiveNote();
+		await until("qaPlugin.views('1Password integration.md').some(v=>v.getViewData().includes(qaMarkers.body))");
+		pass("real 1Password recovery works after plugin reload with empty settings");
+		await evaluate("const view=qaPlugin.views('1Password integration.md')[0];view.editor.replaceRange('\\nQA_IMMEDIATE_CLOSE_EDIT',view.editor.offsetToPos(view.editor.getValue().length));view.leaf.detach();");
+		await until("qaPlugin.coordinator.sessions.size===0");
+		await evaluate("await app.workspace.getLeaf().openFile(app.vault.getAbstractFileByPath('1Password integration.md'));");
+		await until("qaPlugin.views('1Password integration.md').length>0");await unlockLiveNote();
+		assert.equal(await evaluate("return qaPlugin.coordinator.require('1Password integration.md').text.includes('QA_IMMEDIATE_CLOSE_EDIT');"),true);
+		pass("closing immediately after an edit preserves the last edit encrypted");
+		await evaluate("qaPlugin.settings={...qaLiveIdentity};await qaPlugin.saveData(qaPlugin.settings);await qaPlugin.lockAll();app.internalPlugins.getEnabledPluginById('global-search').openGlobalSearch('file:\"1Password integration\"');");
+		assert.equal(await evaluate("return qaPlugin.views('1Password integration.md').every(v=>v.rawFrontmatter===null && Object.values(qaMarkers).every(marker=>!v.contentEl.textContent.includes(marker)));"),true);
+		pass("locking clears hidden native property values and frontmatter caches");
+		pass("final state is locked with only the 1Password reference configured");
+		console.log(JSON.stringify({passed:passed.length,tests:passed},null,2));
+	}
+	else {
+		await evaluate(`
+			globalThis.qaPlugin=app.plugins.plugins['protected-notes'];
+			globalThis.qaRealProvider=qaPlugin.provider;
+			globalThis.qaIdentity={account:'QA',secretRef:'op://abcdefghijklmnopqrstuvwxyz/abcdefghijklmnopqrstuvwxyz/password'};
+			qaPlugin.settings={...qaIdentity};
+			qaPlugin.provider={resolve:async()=> 'Synthetic QA passphrase only',dispose(){},authorize:async()=>{},listVaults:async()=>[]};
+			await app.workspace.getLeaf().openFile(app.vault.getAbstractFileByPath('Private.md'));
+			await qaPlugin.encryptNote();
+		`);
+		await until("qaPlugin.views('Private.md').length===1");
+		assert.equal(await evaluate("return (await app.vault.read(app.vault.getAbstractFileByPath('Private.md'))).startsWith('<protected-note');"), true);
+		pass("encrypt existing .md in place and load native protected view");
+		await evaluate("void qaPlugin.unlockNote('Private.md');"); await click("Unlock with 1Password");
+		await until("qaPlugin.coordinator.sessions.has('Private.md') && qaPlugin.views('Private.md')[0]?.getViewData().includes('Sample note')");
+		pass("unlock through injected provider into native editor");
+		await evaluate("qaPlugin.views('Private.md')[0].editor.setValue('---\\nkind: secret\\n---\\n# After unlock\\n\\nAFTER_UNLOCK_UNIQUE_MARKER\\n\\n| A | B |\\n| --- | --- |\\n| 1 | 2 |\\n');");
+		await until("qaPlugin.coordinator.require('Private.md').text.includes('AFTER_UNLOCK_UNIQUE_MARKER')");
+		await evaluate("await qaPlugin.views('Private.md')[0].save();");
+		assert.equal(await evaluate("return !(await app.vault.read(app.vault.getAbstractFileByPath('Private.md'))).includes('AFTER_UNLOCK_UNIQUE_MARKER');"), true);
+		pass("native editing and save leave disk encrypted");
+		await evaluate("const view=qaPlugin.views('Private.md')[0]; await view.leaf.setViewState({type:'protected-notes',state:{file:'Private.md',mode:'preview'}});");
+		assert.equal(await evaluate("return qaPlugin.views('Private.md')[0].getMode();"), "preview");
+		await until("document.querySelector('.markdown-preview-view')?.textContent.includes('AFTER_UNLOCK_UNIQUE_MARKER')");
+		await evaluate("const view=qaPlugin.views('Private.md')[0]; await view.leaf.setViewState({type:'protected-notes',state:{file:'Private.md',mode:'source',source:true}});");
+		assert.equal(await evaluate("return qaPlugin.views('Private.md')[0].getMode();"), "source");
+		pass("native Reading and Source mode switches preserve unlocked session");
+		await evaluate("await app.workspace.getLeaf('split').setViewState({type:'protected-notes',state:{file:'Private.md',mode:'source'}});");
+		await until("qaPlugin.views('Private.md').length===2 && qaPlugin.views('Private.md').every(v=>v.getViewData().includes('AFTER_UNLOCK_UNIQUE_MARKER'))");
+		await evaluate("await app.workspace.getLeaf().openFile(app.vault.getAbstractFileByPath('Other.md'));");
+		await until("qaPlugin.coordinator.sessions.size===0 && qaPlugin.views('Private.md').every(v=>v.getViewData()==='')");
+		pass("leaving note locks all panes and clears readable content");
+		assert.equal(await evaluate("try { await app.vault.modify(app.vault.getAbstractFileByPath('Private.md'),'UNSAFE_PLAINTEXT'); return false; } catch { return true; }"), true);
+		pass("vault guard rejects plaintext writes by ordinary commands");
+		await evaluate("await app.vault.rename(app.vault.getAbstractFileByPath('Private.md'),'Renamed.md'); qaPlugin.settings={account:'',secretRef:''}; await app.workspace.getLeaf().openFile(app.vault.getAbstractFileByPath('Renamed.md')); ");
+		await click("Unlock with 1Password");
+		await until("qaPlugin.coordinator.sessions.has('Renamed.md')");
+		assert.equal(await evaluate("return qaPlugin.coordinator.require('Renamed.md').text.includes('AFTER_UNLOCK_UNIQUE_MARKER');"), true);
+		pass("rename and missing settings retain embedded-reference recovery");
+		await evaluate("globalThis.qaOriginalCAS=qaPlugin.coordinator.storage.compareAndSwap; qaPlugin.coordinator.storage.compareAndSwap=async()=>{throw Error('simulated disk failure')}; qaPlugin.views('Renamed.md')[0].editor.setValue('# Unsaved\\nQA_ENCRYPTED_RECOVERY_MARKER'); await qaPlugin.lockNote('Renamed.md'); qaPlugin.coordinator.storage.compareAndSwap=qaOriginalCAS;");
+		assert.equal(await evaluate("return qaPlugin.coordinator.recovery.read('Renamed.md')!==null && !qaPlugin.coordinator.sessions.has('Renamed.md');"), true);
+		pass("failed save preserves encrypted recovery and locks safely");
+		await evaluate("void qaPlugin.unlockNote('Renamed.md');"); await click("Unlock with 1Password"); await click("Restore edits");
+		await until("qaPlugin.views('Renamed.md').some(v=>v.getViewData().includes('QA_ENCRYPTED_RECOVERY_MARKER'))");
+		pass("recover unsaved encrypted edits through authorization flow");
+		await evaluate("void qaPlugin.removeProtection();"); await click("Remove protection");
+		await until("app.workspace.getActiveFile()?.path==='Renamed.md' && app.workspace.activeLeaf.view.getViewType()==='markdown'");
+		assert.equal(await evaluate("return (await app.vault.read(app.vault.getAbstractFileByPath('Renamed.md'))).includes('QA_ENCRYPTED_RECOVERY_MARKER');"), true);
+		pass("explicit remove-protection command restores ordinary Markdown");
+		await evaluate("qaPlugin.provider=qaRealProvider; qaPlugin.settings={account:'',secretRef:''};");
+		console.log(JSON.stringify({ passed: passed.length, tests: passed }, null, 2));
+	}
+	if (process.env.OBSIDIAN_QA_SCREENSHOT) { const shot = await rpc("Page.captureScreenshot", { format: "png" }); await writeFile(process.env.OBSIDIAN_QA_SCREENSHOT, Buffer.from(shot.data, "base64")); }
+} finally { socket.close(); }

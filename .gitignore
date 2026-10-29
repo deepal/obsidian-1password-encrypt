@@ -1,0 +1,13 @@
+node_modules/
+main.js
+*.js.map
+.DS_Store
+data.json
+.obsidian/
+.test-vault/
+*.log
+.env
+.env.*
+.npmrc
+recovery/
+dist/

@@ -1,0 +1,14 @@
+import { readFile, stat } from "node:fs/promises";
+import assert from "node:assert/strict";
+const read = async (name) => JSON.parse(await readFile(name, "utf8"));
+const [pkg, lock, manifest, versions] = await Promise.all(["package.json", "package-lock.json", "manifest.json", "versions.json"].map(read));
+assert.equal(manifest.id, "protected-notes"); assert.equal(manifest.isDesktopOnly, true);
+assert.equal(pkg.version, manifest.version); assert.equal(lock.version, manifest.version); assert.equal(lock.packages[""].version, manifest.version);
+assert.equal(versions[manifest.version], manifest.minAppVersion);
+assert.ok((await stat("main.js")).size > 10_000_000, "Expected the SDK's embedded WASM in the self-contained bundle");
+assert.ok((await stat("styles.css")).size > 0);
+const main = await readFile("main.js", "utf8");
+assert.ok(!main.includes("new WebAssembly.Module("), "SDK must compile WASM asynchronously in Electron");
+assert.ok(!main.includes("new WebAssembly.Instance("), "SDK must instantiate WASM asynchronously in Electron");
+assert.ok(!main.includes("core_bg.wasm"), "The runtime must not read an external WASM file");
+console.log(`Verified protected-notes ${manifest.version}: metadata, embedded SDK, and standard release assets.`);

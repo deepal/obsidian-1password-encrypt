@@ -1,0 +1,5 @@
+.protected-notes-lock { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--size-4-3); min-height: 200px; padding: var(--size-4-6); text-align: center; }
+.protected-notes-message { color: var(--text-muted); max-width: 42em; }
+.protected-notes-error { color: var(--text-error); white-space: pre-wrap; }
+.protected-notes-hidden { display: none !important; }
+.protected-notes-reference { overflow-wrap: anywhere; user-select: text; }
