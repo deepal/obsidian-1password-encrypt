@@ -1,12 +1,12 @@
 # Local validation
 
-Validated on 28 October 2026 with Obsidian 1.14.5 on macOS, plugin 0.1.0,
+Validated on 28–29 October 2026 with Obsidian 1.14.5 on macOS, plugin 0.1.0,
 and the bundled 1Password JavaScript SDK 0.5.0.
 
 ## Automated checks
 
 - Clean `npm ci`, TypeScript checking, and zero-warning Obsidian ESLint checks.
-- 44 passing Node tests: authenticated encryption, strict parsing, secret/reference
+- 58 passing Node tests: authenticated encryption, strict parsing, secret/reference
   handling, settings normalization, serialized saves, conflicts, encrypted recovery,
   shutdown, renames, permanent decryption, native lifecycle regressions, write and
   recovery guards, and release metadata/Conventional Commits.
@@ -14,6 +14,10 @@ and the bundled 1Password JavaScript SDK 0.5.0.
   fresh connections on explicit retry, failed reauthorization, vault-list failures,
   no automatic replay of item creation, overlapping old/new requests, disposal,
   error redaction, and clearing the dialog's old error during retry/cancellation.
+- Guided setup regressions cover acknowledgement/account gating, a vault-list
+  request before advancement, empty vaults, retry/cancellation, Back and account
+  changes, mandatory secret readback, mismatched passwords, uncertain creation,
+  and settings indexing without SDK calls.
 - Production build and both the project artifact validator and the Obsidian plugin
   skill's artifact checker passed. The standard three files include all SDK WASM
   and its license notice; no runtime installation or external WASM is needed.
@@ -54,6 +58,19 @@ subsequent personal-vault installation check is recorded below.
   were unchanged; installed asset hashes match the validated production build.
 - The quit/reopen failure and explicit retry paths are covered by the automated
   provider regressions described above.
+
+## Guided setup checks
+
+- Seven synthetic-provider checks passed in the real Obsidian app: initial
+  acknowledgement gating, keyboard Tab/Space navigation, connection and heading
+  focus, Back/retry guidance, empty vaults, a 430 × 780 layout with visible action
+  buttons, and cancellation of a pending connection. Run with
+  `node scripts/obsidian-qa.mjs setup` against the disposable profile.
+- A separate connection through the real 1Password SDK successfully listed vaults
+  and advanced to secret selection. The dialog was then cancelled; this check
+  created no item and saved no settings.
+- Updated the installed Notes-vault assets after an external backup and reloaded
+  the plugin. Existing settings and recovery files were preserved.
 
 ## Limits
 

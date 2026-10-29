@@ -30,6 +30,59 @@ function pass(name) { passed.push(name); console.log(`PASS ${name}`); }
 try {
 	assert.match(await evaluate("return app.vault.getName();"), /^Protected Notes QA/);
 	if (process.argv[2] === "eval") { console.log(JSON.stringify(await evaluate(process.argv[3]))); process.exitCode = 0; }
+	else if (process.argv[2] === "setup") {
+		await evaluate(`
+			globalThis.qaPlugin=app.plugins.plugins['protected-notes'];
+			globalThis.qaSetupOriginal={provider:qaPlugin.provider,settings:{...qaPlugin.settings}};
+			globalThis.qaSetupState={calls:0,fail:false,vaults:[{id:'abcdefghijklmnopqrstuvwxyz',title:'QA vault'}]};
+			qaPlugin.settings={account:'QA',secretRef:'op://abcdefghijklmnopqrstuvwxyz/abcdefghijklmnopqrstuvwxyz/password'};
+			qaPlugin.provider={listVaults:async()=>{qaSetupState.calls++;if(qaSetupState.fail)throw Error('synthetic SDK detail');return qaSetupState.vaults},dispose(){}};
+			void qaPlugin.configureSecret();
+		`);
+		try {
+			await until("document.querySelector('.modal-title')?.textContent==='Connect to 1Password'");
+			assert.equal(await evaluate("return qaSetupState.calls===0 && !document.querySelector('.modal input[type=checkbox]').checked && [...document.querySelectorAll('.modal button')].find(b=>b.textContent==='Connect to 1Password').disabled;"),true);
+			pass("setup starts unchecked and performs no SDK call before explicit connection");
+			// Exercise Chromium's real keyboard defaults on the actual Obsidian controls.
+			await evaluate("document.querySelector('.modal input[type=text]').focus();");
+			for(const type of ['keyDown','keyUp'])await rpc('Input.dispatchKeyEvent',{type,key:'Tab',code:'Tab',windowsVirtualKeyCode:9,modifiers:8});
+			assert.equal(await evaluate("return document.activeElement.type==='checkbox';"),true);
+			for(const type of ['keyDown','keyUp'])await rpc('Input.dispatchKeyEvent',{type,key:' ',code:'Space',windowsVirtualKeyCode:32});
+			assert.equal(await evaluate("return document.querySelector('.modal input[type=checkbox]').checked;"),true);
+			pass("keyboard focus reaches the acknowledgement and Space checks it");
+			await click('Connect to 1Password');
+			await until("document.querySelector('.modal-title')?.textContent==='Choose an encryption secret'");
+			assert.deepEqual(await evaluate("return {calls:qaSetupState.calls,headingFocused:document.activeElement===document.querySelector('.modal-title'),accountVisible:document.querySelector('.protected-notes-connected').textContent.includes('QA')};"),{calls:1,headingFocused:true,accountVisible:true});
+			pass("successful listing advances and announces the connected account");
+			await evaluate("const selects=document.querySelectorAll('.modal select');selects[0].value='create';selects[0].dispatchEvent(new Event('change'));selects[1].value='abcdefghijklmnopqrstuvwxyz';selects[1].dispatchEvent(new Event('change'));for(const field of document.querySelectorAll('.modal input[type=password]')){field.value='synthetic setup draft';field.dispatchEvent(new Event('input'));}");
+			await click('Back');
+			assert.equal(await evaluate("return document.querySelector('.modal-title').textContent==='Connect to 1Password' && document.querySelector('.modal input[type=checkbox]').checked && document.querySelector('.modal input[type=text]').value==='QA' && !document.querySelector('.modal input[type=password]');"),true);
+			await evaluate("qaSetupState.fail=true;");await click('Connect to 1Password');
+			await until("[...document.querySelectorAll('.modal button')].some(b=>b.textContent==='Try again')");
+			assert.equal(await evaluate("return document.querySelector('.modal [role=alert]').textContent.includes('Settings → Developer') && !document.querySelector('.modal [role=alert]').textContent.includes('synthetic SDK detail');"),true);
+			pass("Back requires reconnection; failed requests retain actionable, redacted instructions");
+			await evaluate("qaSetupState.fail=false;qaSetupState.vaults=[];");await click('Try again');
+			await until("document.querySelector('.modal-title')?.textContent==='Choose an encryption secret'");
+			assert.equal(await evaluate("return document.querySelector('.modal select option[value=create]').disabled && ![...document.querySelectorAll('.modal button')].find(b=>b.textContent==='Save and verify').disabled;"),true);
+			pass("empty vault results preserve the existing-reference path");
+			await click('Back');
+			await rpc('Emulation.setDeviceMetricsOverride',{width:430,height:780,deviceScaleFactor:1,mobile:false});
+			assert.equal(await evaluate("const modal=document.querySelector('.modal').getBoundingClientRect();return modal.left>=0 && modal.right<=innerWidth && [...document.querySelectorAll('.modal input,.modal button')].filter(el=>el.getClientRects().length).every(el=>{const rect=el.getBoundingClientRect();return rect.right<=innerWidth && rect.bottom<=modal.bottom;});"),true);
+			if(process.env.OBSIDIAN_QA_SCREENSHOT){const shot=await rpc('Page.captureScreenshot',{format:'png'});await writeFile(process.env.OBSIDIAN_QA_SCREENSHOT,Buffer.from(shot.data,'base64'));}
+			pass("instructions and controls fit a narrow viewport");
+			await evaluate("qaPlugin.provider.listVaults=()=>new Promise(resolve=>{globalThis.qaFinishSetupConnection=resolve});");
+			await click('Connect to 1Password');
+			assert.equal(await evaluate("return document.querySelector('.modal input[type=text]').matches(':disabled') && [...document.querySelectorAll('.modal button')].find(b=>b.textContent==='Connecting…').disabled;"),true);
+			await click('Cancel');await evaluate("qaFinishSetupConnection([]);");
+			await until("qaPlugin.setup===null");
+			assert.equal(await evaluate("return !document.querySelector('.protected-notes-setup');"),true);
+			pass("cancelling a pending connection ignores its late result");
+		} finally {
+			await rpc('Emulation.clearDeviceMetricsOverride');
+			await evaluate("[...document.querySelectorAll('.modal button')].reverse().find(b=>b.textContent==='Cancel')?.click();qaPlugin.provider=qaSetupOriginal.provider;qaPlugin.settings=qaSetupOriginal.settings;");
+		}
+		console.log(JSON.stringify({passed:passed.length,tests:passed},null,2));
+	}
 	else if (process.argv[2] === "live") {
 		await evaluate("globalThis.qaPlugin=app.plugins.plugins['protected-notes'];");
 		await unlockLiveNote();
@@ -118,5 +171,5 @@ try {
 		await evaluate("qaPlugin.provider=qaRealProvider; qaPlugin.settings={account:'',secretRef:''};");
 		console.log(JSON.stringify({ passed: passed.length, tests: passed }, null, 2));
 	}
-	if (process.env.OBSIDIAN_QA_SCREENSHOT) { const shot = await rpc("Page.captureScreenshot", { format: "png" }); await writeFile(process.env.OBSIDIAN_QA_SCREENSHOT, Buffer.from(shot.data, "base64")); }
+	if (process.env.OBSIDIAN_QA_SCREENSHOT && process.argv[2] !== "setup") { const shot = await rpc("Page.captureScreenshot", { format: "png" }); await writeFile(process.env.OBSIDIAN_QA_SCREENSHOT, Buffer.from(shot.data, "base64")); }
 } finally { socket.close(); }

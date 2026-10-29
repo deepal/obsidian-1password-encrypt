@@ -3,3 +3,19 @@
 .protected-notes-error { color: var(--text-error); white-space: pre-wrap; }
 .protected-notes-hidden { display: none !important; }
 .protected-notes-reference { overflow-wrap: anywhere; user-select: text; }
+.protected-notes-setup-modal { width: min(640px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); }
+.protected-notes-step { color: var(--text-muted); font-size: var(--font-ui-small); }
+.protected-notes-instructions { padding: var(--size-4-4); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); }
+.protected-notes-instructions h3 { margin-top: 0; }
+.protected-notes-instructions li + li { margin-top: var(--size-4-2); }
+.protected-notes-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.protected-notes-acknowledgement { display: flex; align-items: flex-start; gap: var(--size-4-2); margin-top: var(--size-4-4); cursor: pointer; }
+.protected-notes-acknowledgement input { flex: none; }
+.protected-notes-connected { padding: var(--size-4-3); background: var(--background-secondary); border-left: 3px solid var(--text-success); overflow-wrap: anywhere; }
+.protected-notes-setup .setting-item { flex-wrap: wrap; gap: var(--size-4-2); }
+.protected-notes-setup .setting-item-control { flex-wrap: wrap; }
+.protected-notes-setup input[type="text"], .protected-notes-setup input[type="password"], .protected-notes-setup select { max-width: 100%; }
+@media (max-width: 600px) {
+  .protected-notes-setup .setting-item { flex-direction: column; align-items: stretch; }
+  .protected-notes-setup .setting-item-control { justify-content: flex-start; }
+}

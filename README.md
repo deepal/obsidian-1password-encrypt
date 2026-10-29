@@ -20,17 +20,28 @@ Enable **1password Encrypt** under **Settings → Community plugins**, then set 
 
 ## Set up
 
-1. In **1Password → Settings → Developer**, enable **Integrate with 1Password SDKs**.
-2. In Obsidian, open **Settings → 1password Encrypt → Set up**.
-3. Enter the 1Password account name or ID. Choose an existing secret reference,
-   or choose a vault, enter a new password and confirmation, and create an item.
-4. Authorize access in 1Password. The plugin verifies the saved value before it
-   encrypts any note. Your 1Password account password is never requested by this plugin.
+1. In Obsidian, open **Settings → 1password Encrypt → Set up** or **Setup help**.
+2. Follow the first screen: open **1Password → Settings → Developer**, enable
+   **Integrate with 1Password SDKs**, and keep the desktop app running.
+3. Check **I’ve enabled “Integrate with 1Password SDKs”**, enter your account name
+   or ID, and click **Connect to 1Password**. Approve the request inside 1Password;
+   it may identify the requesting application as Obsidian. The plugin lists vaults
+   to verify the connection before showing the secret setup screen.
+4. Choose an existing secret reference, or choose a vault and enter a new password
+   and confirmation. Click **Save and verify**. The plugin retrieves the secret
+   again before saving settings or encrypting any note. Your 1Password account
+   password is never requested by this plugin.
 5. Open a Markdown note and run **1password Encrypt: Encrypt current note**.
 
 Use a long, unique note-encryption passphrase. New notes use the configured default
 reference; already encrypted notes retain their own reference. Changing the default
 does not rotate the passwords of existing notes.
+
+Each setup visit starts with an unchecked confirmation and a new connection check.
+Neither is stored in settings. **Back** clears password fields and requires another
+connection check. After item creation has been attempted, the account is fixed to
+avoid accidentally creating duplicate items; cancel and reopen to change accounts.
+Connection failures keep your account entry and instructions visible for retry.
 
 The setup wizard does not retry an uncertain item-creation operation. If creation
 could not be confirmed, inspect 1Password for **1password Encrypt password**
@@ -159,6 +170,11 @@ the development debugger. It refuses vaults whose names do not start with
 `Protected Notes QA`. This verifies editor/persistence integration, independently
 of a real authenticated 1Password test. Do not enable remote debugging for everyday
 use or expose its port to the network.
+
+Run `node scripts/obsidian-qa.mjs setup` against that disposable profile to check
+the guided connection screen, real keyboard focus, retries, Back, cancellation,
+and narrow layouts using a synthetic provider. Live 1Password authorization is
+verified separately and remains under the user's control.
 
 CI runs lint, tests, build, and artifact checks on pushes and pull requests.
 Publishing is a separate manual action: run **CI and release** on `main` with
