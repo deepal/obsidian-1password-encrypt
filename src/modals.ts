@@ -16,7 +16,7 @@ export class ActionModal extends Modal {
 	private resolve!: (value: boolean) => void;
 	private errorEl!: HTMLElement;
 	private busy = false;
-	constructor(app: App, private title: string, private description: string, private action: () => Promise<void>, private button = "Unlock with 1Password", private extra?: (container: HTMLElement) => void) { super(app); }
+	constructor(app: App, private title: string, private description: string, private action: () => Promise<void>, private button = "Open with 1Password", private extra?: (container: HTMLElement) => void) { super(app); }
 	wait(): Promise<boolean> { const result = new Promise<boolean>((resolve) => { this.resolve = resolve; }); this.open(); return result; }
 	onOpen(): void {
 		this.setTitle(this.title);
@@ -106,7 +106,7 @@ export class SetupModal extends Modal {
 	private renderSecret(): void {
 		const account = this.connectedAccount;
 		if (!account || this.done) return;
-		this.contentEl.empty(); this.setTitle("Choose an encryption secret"); this.titleEl.tabIndex = -1;
+		this.contentEl.empty(); this.setTitle("Choose a password"); this.titleEl.tabIndex = -1;
 		this.contentEl.createEl("p", { text: "Step 2 of 2", cls: "protected-notes-step" });
 		this.message("status", "protected-notes-connected").setText(`Connected to 1Password — ${this.connectedAccount}`);
 		this.contentEl.createEl("p", { text: "Your secret will be verified again before settings are saved." });

@@ -38,6 +38,6 @@ export async function loadFixture(entry) {
  return await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString("base64")}`);
 }
 export function elements(root){return [root,...root.children.flatMap(elements)];}
-export function button(modal,label="Unlock with 1Password"){return elements(modal.contentEl).find(el=>el.label===label);}
+export function button(modal,label="Open with 1Password"){return elements(modal.contentEl).find(el=>el.label===label);}
 export function input(modal,name){return elements(modal.contentEl).find(el=>el.settingName===name);}
 export function checkbox(modal){return elements(modal.contentEl).find(el=>el.type==='checkbox');}

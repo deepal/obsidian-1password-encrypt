@@ -55,14 +55,7 @@ export default class ProtectedNotesPlugin extends Plugin {
 		this.enabled = true;
 		this.registerView(PROTECTED_VIEW, (leaf) => new ProtectedMarkdownView(leaf, this));
 		this.addSettingTab(new ProtectedNotesSettingTab(this.app, this));
-		for (const [id, name, run] of [
-			["encrypt-note", "Encrypt current note", () => this.encryptNote()],
-			["unlock-note", "Unlock current note", () => this.unlockNote(this.currentPath())],
-			["lock-note", "Lock current note", () => this.lockNote(this.currentPath())],
-			["lock-all-notes", "Lock all notes", () => this.lockAll()],
-			["remove-protection", "Remove protection from current note", () => this.removeProtection()],
-			["configure-secret", "Configure 1Password secret", () => this.configureSecret()],
-		] as const) this.addCommand({ id, name, callback: () => { void this.run(run); } });
+		this.registerCommands();
 		this.registerEvent(this.app.workspace.on("layout-change", () => {
 			if (this.ready) { void this.routeAll(false); void Promise.resolve().then(() => this.lockClosedNotes()); }
 		}));
@@ -104,10 +97,36 @@ export default class ProtectedNotesPlugin extends Plugin {
 		if (!(file instanceof TFile) || file.extension !== "md") throw new ProtectionError("Open a Markdown note first.");
 		return file;
 	}
+	/** Palette/settings focus must not lose the current document or revive a
+	 * closed note from activePath. This also follows the most recent popout pane.
+	 */
+	private currentNote(): TFile | null {
+		const view = this.app.workspace.getMostRecentLeaf()?.view;
+		if (!(view instanceof MarkdownView) || !(view.file instanceof TFile) || view.file.extension !== "md") return null;
+		return this.app.vault.getAbstractFileByPath(view.file.path) === view.file ? view.file : null;
+	}
 	private currentPath(): string {
-		const file = this.app.workspace.getActiveFile();
+		const file = this.currentNote();
 		if (!file) throw new ProtectionError("Open a Markdown note first.");
-		return this.note(file.path).path;
+		return file.path;
+	}
+	private registerCommands(): void {
+		const canUseNote = (protectedNote: boolean) => {
+			const file = this.currentNote();
+			if (!file || this.transitioning.has(file.path) || this.departing.has(file.path)) return false;
+			const protectedFile = this.app.workspace.getMostRecentLeaf()?.view instanceof ProtectedMarkdownView || this.guard.protectedPaths.has(file.path) || this.coordinator.sessions.has(file.path);
+			return protectedFile === protectedNote;
+		};
+		for (const [id, name, available, run] of [
+			["encrypt-note", "Protect this note", () => canUseNote(false), () => this.encryptNote()],
+			["remove-protection", "Remove protection", () => canUseNote(true), () => this.removeProtection()],
+			["lock-all-notes", "Lock all protected notes now", () => this.coordinator.sessions.size > 0 || this.prompts.size > 0 || this.opening.size > 0, () => this.lockAll()],
+			["configure-secret", "Set up 1Password", () => true, () => this.configureSecret()],
+		] as const) this.addCommand({ id, name, checkCallback: (checking) => {
+			if (!this.enabled || !available()) return false;
+			if (!checking) void this.run(run);
+			return true;
+		} });
 	}
 	views(path?: string): ProtectedMarkdownView[] {
 		const result: ProtectedMarkdownView[] = [];
@@ -152,7 +171,7 @@ export default class ProtectedNotesPlugin extends Plugin {
 		if (hasProtectedMarker(await this.app.vault.read(originalFile))) throw new ProtectionError("This note is already protected.");
 		if (!isConfigured(this.settings) && !await this.configureSecret()) return;
 		let password = await this.provider.resolve(this.settings);
-		if (!this.enabled || this.currentPath() !== path) { password = ""; return; }
+		if (!this.enabled || this.currentNote()?.path !== path) { password = ""; return; }
 		this.transitioning.add(path);
 		const ordinary: Array<{ leaf: WorkspaceLeaf; view: MarkdownView; state: Record<string, unknown> }> = [];
 		try {
@@ -180,7 +199,7 @@ export default class ProtectedNotesPlugin extends Plugin {
 				view.clear();
 				await leaf.setViewState({ type: PROTECTED_VIEW, state: { ...state, file: path } });
 			}
-			new Notice("Note encrypted. Its filename is unchanged.");
+			new Notice("Note protected. Open it with 1Password whenever you need it.");
 		} catch (error) {
 			if (!hasProtectedMarker(await this.app.vault.read(originalFile))) {
 				this.guard.protectedPaths.delete(path);
@@ -192,19 +211,19 @@ export default class ProtectedNotesPlugin extends Plugin {
 	async unlockNote(path: string): Promise<void> {
 		if (!this.enabled || this.prompts.has(path) || this.opening.has(path)) return;
 		this.opening.add(path);
-		try { await this.openUnlockModal(path); }
+		try { await this.openUnlockModal(path, this.routeGeneration); }
 		finally { this.opening.delete(path); }
 	}
-	private async openUnlockModal(path: string): Promise<void> {
+	private async openUnlockModal(path: string, token: number): Promise<void> {
 		if (this.coordinator.sessions.has(path)) { for (const view of this.views(path)) view.showUnlocked(this.coordinator.require(path).text); return; }
 		const source = await this.app.vault.read(this.note(path));
+		if (!this.enabled || token !== this.routeGeneration || this.currentNote()?.path !== path || !this.views(path).length) return;
 		let identity;
 		try { identity = parseEnvelope(source); } catch (error) { this.report(error); return; }
 		const selected = { account: identity.account, secretRef: identity.secretRef };
-		const token = this.routeGeneration;
 		let modal: ActionModal;
-		modal = new ActionModal(this.app, "Unlock protected note", "Authorize 1password Encrypt in the 1Password desktop app. Your account password stays in 1Password.", async () => {
-			const current = () => this.enabled && token === this.routeGeneration && this.prompts.get(path) === modal && (this.app.workspace.getActiveFile()?.path ?? this.activePath) === path && this.views(path).length > 0;
+		modal = new ActionModal(this.app, "Open protected note", "Approve access in 1Password to read or edit this note. It stays protected while you work.", async () => {
+			const current = () => this.enabled && token === this.routeGeneration && this.prompts.get(path) === modal && this.currentNote()?.path === path && this.views(path).length > 0;
 			let password = await this.provider.resolve(selected);
 			try {
 				if (!current()) throw new ProtectionError("Unlock cancelled.");
@@ -222,7 +241,7 @@ export default class ProtectedNotesPlugin extends Plugin {
 				for (const view of this.views(path)) view.showUnlocked(this.coordinator.require(path).text, true);
 			} catch (error) { if (!this.views(path).some((view) => view.getViewData())) this.coordinator.dispose(path); throw error; }
 			finally { password = ""; }
-		}, "Unlock with 1Password", (container) => {
+		}, "Open with 1Password", (container) => {
 			const details = container.createEl("details");
 			details.createEl("summary", { text: "Locate an existing secret" });
 			new Setting(details).setName("1Password account").addText((text) => text.setValue(selected.account).onChange((value) => { selected.account = value.trim(); }));
@@ -264,10 +283,11 @@ export default class ProtectedNotesPlugin extends Plugin {
 	}
 	async lockAll(): Promise<void> {
 		this.routeGeneration++;
+		this.requestedPrompts.clear();
 		for (const modal of this.prompts.values()) modal.close();
 		for (const path of [...this.coordinator.sessions.keys()]) await this.lockNote(path);
 	}
-	async externalChange(path: string): Promise<void> { await this.lockNote(path); this.report(new ProtectionError("The encrypted file changed outside this editor. Unlock again to read it or recover local edits.")); }
+	async externalChange(path: string): Promise<void> { await this.lockNote(path); this.report(new ProtectionError("The encrypted file changed outside this editor. Open it again with 1Password to read it or recover local edits.")); }
 	async removeProtection(): Promise<void> {
 		const path = this.currentPath();
 		if (!this.coordinator.sessions.has(path)) await this.unlockNote(path);

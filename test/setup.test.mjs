@@ -23,7 +23,7 @@ test('setup instructions precede the account; checkbox and account jointly gate 
  m.close();assert.equal(await f.result,null);
 });
 test('successful vault listing advances without persisting acknowledgement or settings',async()=>{
- const f=fixture();await connect(f);assert.equal(f.modal.title,'Choose an encryption secret');assert.deepEqual(f.calls.list,['QA']);assert.deepEqual(f.calls.save,[]);
+ const f=fixture();await connect(f);assert.equal(f.modal.title,'Choose a password');assert.deepEqual(f.calls.list,['QA']);assert.deepEqual(f.calls.save,[]);
  assert.ok(f.modal.contentEl.textContent.includes('Connected to 1Password — QA'));
  assert.equal(input(f.modal,'1Password vault').options[1].text,'QA vault');assert.equal(button(f.modal,'Load vaults'),undefined);
  assert.equal(f.modal.titleEl.focused,true);f.modal.close();await f.result;
@@ -41,7 +41,7 @@ test('connection failure is actionable and redacted; retry preserves input and c
  let calls=0;const d=deferred();const f=fixture({listVaults:async()=>{if(++calls===1)throw Error('PRIVATE SDK DETAIL');return await d.promise}});
  await connect(f);assert.equal(checkbox(f.modal).checked,true);assert.equal(input(f.modal,'1Password account').value,'QA');
  const error=elements(f.modal.contentEl).find(el=>el.attributes.role==='alert');assert.ok(error.textContent.includes('Settings → Developer'));assert.ok(!error.textContent.includes('PRIVATE SDK DETAIL'));
- const retry=button(f.modal,'Try again').click();assert.equal(error.textContent,'');d.resolve(vaults);await retry;assert.equal(f.modal.title,'Choose an encryption secret');f.modal.close();
+ const retry=button(f.modal,'Try again').click();assert.equal(error.textContent,'');d.resolve(vaults);await retry;assert.equal(f.modal.title,'Choose a password');f.modal.close();
 });
 test('closing during a failed connection ignores its late error',async()=>{
  const d=deferred();const f=fixture({listVaults:()=>d.promise});checkbox(f.modal).change(true);const pending=button(f.modal,'Connect to 1Password').click();f.modal.close();d.reject(Error('late payload'));await pending;assert.equal(await f.result,null);assert.equal(f.modal.contentEl.children.length,0);

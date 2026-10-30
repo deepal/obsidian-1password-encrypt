@@ -31,7 +31,7 @@ Enable **1password Encrypt** under **Settings → Community plugins**, then set 
    and confirmation. Click **Save and verify**. The plugin retrieves the secret
    again before saving settings or encrypting any note. Your 1Password account
    password is never requested by this plugin.
-5. Open a Markdown note and run **1password Encrypt: Encrypt current note**.
+5. Open a Markdown note and run **1password Encrypt: Protect this note**.
 
 Use a long, unique note-encryption passphrase. New notes use the configured default
 reference; already encrypted notes retain their own reference. Changing the default
@@ -47,15 +47,20 @@ The setup wizard does not retry an uncertain item-creation operation. If creatio
 could not be confirmed, inspect 1Password for **1password Encrypt password**
 and use its existing reference, instead of creating duplicates.
 
-## Reading, editing, and locking
+## Using protected notes
 
-Opening a protected note displays an **Unlock with 1Password** popup. Cancelling
-leaves the note locked. Restored startup tabs show an unlock button without opening
-multiple dialogs. 1Password controls authorization and may reuse a session until
+Protect a note once, then use **Open with 1Password** whenever you want to read or
+edit it. Its contents hide automatically when you switch to another note or close
+its last pane. Protection stays active while you work; there is no need to protect
+the note again after editing.
+
+Opening a protected note displays an **Open protected note** popup. Cancelling
+leaves its contents hidden. Restored startup tabs show an **Open with 1Password**
+button without opening multiple dialogs. 1Password controls authorization and may reuse a session until
 ten minutes of inactivity or locking 1Password; a new biometric prompt is not
 guaranteed for every note.
 
-If a request fails after quitting 1Password, reopen 1Password and click **Unlock
+If a request fails after quitting 1Password, reopen 1Password and click **Open
 with 1Password** again. Failed connections are discarded, so the next attempt
 connects to the running app again. The previous error clears while authorization
 is pending. Item-creation requests are never automatically replayed.
@@ -76,12 +81,19 @@ Reading modes or opening the command palette does not lock it.
 
 | Command | Purpose |
 | --- | --- |
-| Encrypt current note | Set up if necessary and encrypt the entire note |
-| Unlock current note | Retrieve its secret from 1Password and decrypt in memory |
-| Lock current note | Save encrypted edits and lock every pane of that note |
-| Lock all notes | End all unlocked sessions |
-| Remove protection from current note | Confirm and deliberately restore plaintext Markdown |
-| Configure 1Password secret | Create a password or configure an existing reference |
+| Protect this note | Set up if necessary and protect the current ordinary Markdown note |
+| Remove protection | Confirm and turn the current protected note back into ordinary Markdown |
+| Lock all protected notes now | Immediately hide all readable protected content and cancel pending opening requests in this vault |
+| Set up 1Password | Create a password or configure an existing reference |
+
+Only commands that apply to the current state appear in the command palette.
+Ordinary unprotected notes are unaffected by **Lock all protected notes now**.
+Removing protection makes the note readable to search, sync, backups, and other
+plugins; it always requires confirmation.
+
+The individual **Lock current note** and **Unlock current note** commands have
+been removed, so their old hotkeys no longer work. Existing hotkeys for Protect
+(previously Encrypt), Remove protection, Lock all, and Setup retain their IDs.
 
 ## Recovery and reinstalling
 
@@ -175,6 +187,11 @@ Run `node scripts/obsidian-qa.mjs setup` against that disposable profile to chec
 the guided connection screen, real keyboard focus, retries, Back, cancellation,
 and narrow layouts using a synthetic provider. Live 1Password authorization is
 verified separately and remains under the user's control.
+
+Run `node scripts/obsidian-qa.mjs workflow` in that disposable profile to verify
+the four contextual commands, Protect/Open/Cancel, editor modes, popouts,
+automatic hiding, pending-request cancellation, and removal confirmation with a
+synthetic provider.
 
 CI runs lint, tests, build, and artifact checks on pushes and pull requests.
 Publishing is a separate manual action: run **CI and release** on `main` with

@@ -68,13 +68,13 @@ export class ProtectedMarkdownView extends MarkdownView {
 			for (const child of Array.from(this.contentEl.children)) child.classList.toggle("protected-notes-hidden", child === this.lockEl);
 		} finally { this.synchronizing = false; }
 	}
-	showLocked(message = "This note is encrypted. Unlock it with 1Password to read or edit it."): void {
+	showLocked(message = "This note is protected. Open it with 1Password to read or edit it."): void {
 		this.locked = true; this.generation++;
 		this.clearNativeSecrets();
 		this.lockEl.empty();
 		this.lockEl.createEl("h2", { text: "Protected note" });
 		this.lockEl.createEl("p", { text: message, cls: "protected-notes-message" });
-		const button = this.lockEl.createEl("button", { text: "Unlock with 1Password", cls: "mod-cta" });
+		const button = this.lockEl.createEl("button", { text: "Open with 1Password", cls: "mod-cta" });
 		button.addEventListener("click", () => { if (this.file) void this.owner.unlockNote(this.file.path); });
 		for (const child of Array.from(this.contentEl.children)) child.classList.toggle("protected-notes-hidden", child !== this.lockEl);
 	}

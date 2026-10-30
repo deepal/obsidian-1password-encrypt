@@ -1,12 +1,12 @@
 # Local validation
 
-Validated on 28–29 October 2026 with Obsidian 1.14.5 on macOS, plugin 0.1.0,
+Validated on 28–30 October 2026 with Obsidian 1.14.5 on macOS, plugin 0.1.0,
 and the bundled 1Password JavaScript SDK 0.5.0.
 
 ## Automated checks
 
 - Clean `npm ci`, TypeScript checking, and zero-warning Obsidian ESLint checks.
-- 58 passing Node tests: authenticated encryption, strict parsing, secret/reference
+- 74 passing Node tests: authenticated encryption, strict parsing, secret/reference
   handling, settings normalization, serialized saves, conflicts, encrypted recovery,
   shutdown, renames, permanent decryption, native lifecycle regressions, write and
   recovery guards, and release metadata/Conventional Commits.
@@ -18,6 +18,10 @@ and the bundled 1Password JavaScript SDK 0.5.0.
   request before advancement, empty vaults, retry/cancellation, Back and account
   changes, mandatory secret readback, mismatched passwords, uncertain creation,
   and settings indexing without SDK calls.
+- Command regressions cover the four stable IDs and contextual visibility,
+  palette/popout context, execution-time target checks, cancellation before file
+  loading or authorization completes, explicit plaintext confirmation, and no
+  success notices after failed saves. Command checks perform no SDK calls or I/O.
 - Production build and both the project artifact validator and the Obsidian plugin
   skill's artifact checker passed. The standard three files include all SDK WASM
   and its license notice; no runtime installation or external WASM is needed.
@@ -47,7 +51,8 @@ subsequent personal-vault installation check is recorded below.
 - A scan of 134 files in the disposable vault and profile found no copy of the
   actual test password. Plaintext-marker scans ran before entering those markers
   as search queries, since user-entered search history is intentionally persistent.
-- All six command IDs were registered in the running app.
+- All four current command IDs were registered in the running app; the individual
+  Lock and Unlock commands are no longer registered.
 
 ## Installed reconnect fix
 
@@ -71,6 +76,22 @@ subsequent personal-vault installation check is recorded below.
   created no item and saved no settings.
 - Updated the installed Notes-vault assets after an external backup and reloaded
   the plugin. Existing settings and recovery files were preserved.
+
+## Simplified workflow checks
+
+- Re-ran the ten synthetic-provider persistence scenarios and seven guided-setup
+  scenarios with the new labels in a fresh disposable vault.
+- Nine additional real-app workflow checks passed: contextual command discovery,
+  Protect/Open/Cancel, Source/Live Preview/Reading and command-palette focus,
+  encrypted saves and command targeting in a popout, automatic multi-pane
+  clearing, the global privacy command, pending authorization cancellation,
+  immediate last-pane-close persistence, and explicit removal confirmation.
+- Run `node scripts/obsidian-qa.mjs workflow` against the disposable profile to
+  reproduce the simplified workflow checks. Its passwords and contents are
+  synthetic; it does not authorize or mutate a real 1Password item.
+- Local Notes delivery verified the updated asset hashes and enabled state after
+  plugin reload, with settings, existing recovery, and hotkey configuration
+  preserved. Full workflow checks were performed in the disposable vault.
 
 ## Limits
 
