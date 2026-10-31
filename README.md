@@ -13,13 +13,13 @@ Windows/Linux require equivalent live validation before claiming support there.
 ## Install a local build
 
 Build with the development commands below, then copy `main.js`, `manifest.json`,
-and `styles.css` into `<vault>/.obsidian/plugins/1password-encrypt/`.
+and `styles.css` into `<vault>/.obsidian/plugins/password-protected-notes/`.
 Enable **1password Encrypt** under **Settings → Community plugins**, then set up
 1Password as described below. Begin with disposable notes.
 
-If upgrading a local `protected-notes` installation, close Obsidian and rename
-the plugin folder to `1password-encrypt`, keeping its `data.json` and `recovery/`
-contents. Re-enable the plugin after reopening Obsidian and reassign command
+If upgrading a local `protected-notes` or `1password-encrypt` installation, close
+Obsidian and rename the plugin folder to `password-protected-notes`, keeping its
+`data.json` and `recovery/` contents. Re-enable the plugin after reopening Obsidian and reassign command
 hotkeys under the new plugin ID.
 
 ## Set up

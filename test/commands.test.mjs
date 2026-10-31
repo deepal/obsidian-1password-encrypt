@@ -10,7 +10,7 @@ export const notices=[];
 export class Notice { constructor(text){notices.push(text);} }
 export class FileSystemAdapter {}
 export class TFile { constructor(path){this.path=path;this.extension=path.split('.').pop();} }
-export class Plugin { constructor(app){this.app=app;this.manifest={id:'1password-encrypt',version:'0.1.0'};this.commands=[];} addCommand(command){this.commands.push(command);return command;} }
+export class Plugin { constructor(app){this.app=app;this.manifest={id:'password-protected-notes',version:'0.1.0'};this.commands=[];} addCommand(command){this.commands.push(command);return command;} }
 export class MarkdownView {
  constructor(){this.contentEl=new Element();this.value='ordinary text';this.lastSavedData='';this.saving=false;this.dirty=false;this.metadataEditor={clear(){}};}
  clear(){this.value='';} getViewData(){return this.value;} setViewData(text){this.value=text;}

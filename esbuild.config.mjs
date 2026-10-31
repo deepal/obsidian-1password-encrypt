@@ -31,7 +31,7 @@ const deployment = {
 	setup(build) {
 		build.onEnd(async ({ errors }) => {
 			if (errors.length) return;
-			const destination = process.env.OBSIDIAN_PLUGIN_DIR || (process.env.OBSIDIAN_VAULT_DIR && join(process.env.OBSIDIAN_VAULT_DIR, ".obsidian/plugins/1password-encrypt"));
+			const destination = process.env.OBSIDIAN_PLUGIN_DIR || (process.env.OBSIDIAN_VAULT_DIR && join(process.env.OBSIDIAN_VAULT_DIR, ".obsidian/plugins/password-protected-notes"));
 			if (!destination) return;
 			await mkdir(destination, { recursive: true });
 			await Promise.all(["main.js", "manifest.json", "styles.css"].map((file) => copyFile(file, join(destination, file))));
@@ -44,7 +44,7 @@ const context = await esbuild.context({
 	minify: production,
 	external: ["obsidian", "electron", "@codemirror/*", "@lezer/*", ...builtinModules, "node:*"],
 	plugins: [inlineSdkWasm, deployment],
-	banner: { js: "/* Generated bundle. Source: obsidian-protected-notes.\n" + await readFile("THIRD_PARTY_NOTICES.md", "utf8") + "\n*/" },
+	banner: { js: "/* Generated bundle. Source: obsidian-password-protected-notes.\n" + await readFile("THIRD_PARTY_NOTICES.md", "utf8") + "\n*/" },
 });
 if (production) { await context.rebuild(); await context.dispose(); }
 else await context.watch();

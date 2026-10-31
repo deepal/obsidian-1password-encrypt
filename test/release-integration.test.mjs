@@ -14,7 +14,7 @@ const exec = promisify(execFile), project = fileURLToPath(new URL("..", import.m
 const metadata = ["package.json", "package-lock.json", "manifest.json", "versions.json"];
 
 async function fixture(t) {
-  const root = await mkdtemp(path.join(tmpdir(), "1password-encrypt-release-"));
+  const root = await mkdtemp(path.join(tmpdir(), "password-protected-notes-release-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const cwd = path.join(root, "checkout"), remote = path.join(root, "remote.git");
   await mkdir(path.join(cwd, "scripts"), { recursive: true });
@@ -25,16 +25,16 @@ async function fixture(t) {
   await git("init", "--initial-branch=main");
   // Keep a genuine URL for the notes generator, with Git confined to a local
   // bare repository. No credential or network access is needed by these tests.
-  const repositoryUrl = "https://example.test/1password-encrypt.git";
+  const repositoryUrl = "https://example.test/password-protected-notes.git";
   await git("config", `url.${pathToFileURL(remote).href}.insteadOf`, repositoryUrl);
   await git("remote", "add", "origin", repositoryUrl);
   const files = {
-    "package.json": JSON.stringify({ name: "1password-encrypt-release-test", version: "0.1.0", private: true, type: "module", scripts: { build: "node build.mjs" } }),
+    "package.json": JSON.stringify({ name: "password-protected-notes-release-test", version: "0.1.0", private: true, type: "module", scripts: { build: "node build.mjs" } }),
     "package-lock.json": JSON.stringify({ version: "0.1.0", lockfileVersion: 3, packages: { "": { version: "0.1.0" } } }),
-    "manifest.json": JSON.stringify({ id: "1password-encrypt", version: "0.1.0", minAppVersion: "1.14.5", isDesktopOnly: true }),
+    "manifest.json": JSON.stringify({ id: "password-protected-notes", version: "0.1.0", minAppVersion: "1.14.5", isDesktopOnly: true }),
     "versions.json": JSON.stringify({ "0.1.0": "1.14.5" }),
     ".gitignore": "node_modules\nmain.js\n",
-    "styles.css": ".1password-encrypt-review {}\n",
+    "styles.css": ".password-protected-notes-review {}\n",
     "build.mjs": `import fs from 'node:fs';
 if(process.env.OBSIDIAN_PLUGIN_DIR || process.env.OBSIDIAN_VAULT_DIR) throw Error('Release must disable deployment');
 if(process.env.FAIL_RELEASE_BUILD) throw Error('intentional build failure');

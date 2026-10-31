@@ -11,7 +11,7 @@ import config from "../release.config.mjs";
 const exec=promisify(execFile);
 test("release preparation synchronizes metadata and preserves compatibility history",async(t)=>{
 	const cwd=await mkdtemp(join(tmpdir(),"protected-notes-release-"));t.after(()=>rm(cwd,{recursive:true,force:true}));
-	const originals={"package.json":{version:"0.1.0",private:true},"package-lock.json":{version:"0.1.0",packages:{"":{version:"0.1.0"}}},"manifest.json":{id:"1password-encrypt",version:"0.1.0",minAppVersion:"1.14.5"},"versions.json":{"0.1.0":"1.14.5"}};
+	const originals={"package.json":{version:"0.1.0",private:true},"package-lock.json":{version:"0.1.0",packages:{"":{version:"0.1.0"}}},"manifest.json":{id:"password-protected-notes",version:"0.1.0",minAppVersion:"1.14.5"},"versions.json":{"0.1.0":"1.14.5"}};
 	for(const [name,value] of Object.entries(originals))await writeFile(join(cwd,name),JSON.stringify(value));
 	const script=fileURLToPath(new URL("../scripts/prepare-release.mjs",import.meta.url));
 	await assert.rejects(exec(process.execPath,[script,"v1.0.0"],{cwd}));
