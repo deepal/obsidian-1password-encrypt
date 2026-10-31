@@ -29,7 +29,7 @@ const passed = [];
 function pass(name) { passed.push(name); console.log(`PASS ${name}`); }
 try {
 	assert.match(await evaluate("return app.vault.getName();"), /^Protected Notes QA/);
-	await evaluate("globalThis.qaModalButtons=()=>{const docs=new Set([document]);app.workspace.iterateAllLeaves(leaf=>{if(leaf.view.containerEl?.ownerDocument)docs.add(leaf.view.containerEl.ownerDocument)});for(const modal of app.plugins.plugins['protected-notes']?.prompts.values()??[])docs.add(modal.contentEl.ownerDocument);return [...docs].flatMap(doc=>[...doc.querySelectorAll('.modal button')]);};");
+	await evaluate("globalThis.qaModalButtons=()=>{const docs=new Set([document]);app.workspace.iterateAllLeaves(leaf=>{if(leaf.view.containerEl?.ownerDocument)docs.add(leaf.view.containerEl.ownerDocument)});for(const modal of app.plugins.plugins['1password-encrypt']?.prompts.values()??[])docs.add(modal.contentEl.ownerDocument);return [...docs].flatMap(doc=>[...doc.querySelectorAll('.modal button')]);};");
 	// A restored floating Settings window otherwise receives native modals even
 	// though this CDP connection targets the main note window.
 	if (process.argv[2] !== "eval") for (const page of pages) {
@@ -39,7 +39,7 @@ try {
 	if (process.argv[2] === "eval") { console.log(JSON.stringify(await evaluate(process.argv[3]))); process.exitCode = 0; }
 	else if (process.argv[2] === "setup") {
 		await evaluate(`
-			globalThis.qaPlugin=app.plugins.plugins['protected-notes'];
+			globalThis.qaPlugin=app.plugins.plugins['1password-encrypt'];
 			globalThis.qaSetupOriginal={provider:qaPlugin.provider,settings:{...qaPlugin.settings}};
 			globalThis.qaSetupState={calls:0,fail:false,vaults:[{id:'abcdefghijklmnopqrstuvwxyz',title:'QA vault'}]};
 			qaPlugin.settings={account:'QA',secretRef:'op://abcdefghijklmnopqrstuvwxyz/abcdefghijklmnopqrstuvwxyz/password'};
@@ -92,22 +92,22 @@ try {
 	}
 	else if (process.argv[2] === "workflow") {
 		await evaluate(`
-			globalThis.qaPlugin=app.plugins.plugins['protected-notes'];
+			globalThis.qaPlugin=app.plugins.plugins['1password-encrypt'];
 			globalThis.qaWorkflowOriginal={provider:qaPlugin.provider,settings:{...qaPlugin.settings}};
 			const suffix=require('node:crypto').randomBytes(6).toString('hex');
 			globalThis.qaWorkflowPath='Workflow '+suffix+'.md';globalThis.qaWorkflowOther='Other '+suffix+'.md';
 			await app.vault.create(qaWorkflowPath,'# Synthetic workflow note');await app.vault.create(qaWorkflowOther,'# Ordinary synthetic note');
 			qaPlugin.settings={account:'QA',secretRef:'op://abcdefghijklmnopqrstuvwxyz/abcdefghijklmnopqrstuvwxyz/password'};
 			globalThis.qaWorkflowReads=0;qaPlugin.provider={resolve:async()=>{qaWorkflowReads++;return 'Synthetic workflow password'},dispose(){}};
-			globalThis.qaAvailableCommands=()=>Object.values(app.commands.commands).filter(c=>c.id.startsWith('protected-notes:')&&c.checkCallback(true)).map(c=>c.id.split(':')[1]).sort();
+			globalThis.qaAvailableCommands=()=>Object.values(app.commands.commands).filter(c=>c.id.startsWith('1password-encrypt:')&&c.checkCallback(true)).map(c=>c.id.split(':')[1]).sort();
 			await app.workspace.getLeaf().openFile(app.vault.getAbstractFileByPath(qaWorkflowPath));
 		`);
 		try {
-			assert.deepEqual(await evaluate("return Object.keys(app.commands.commands).filter(id=>id.startsWith('protected-notes:')).sort();"),['configure-secret','encrypt-note','lock-all-notes','remove-protection'].map(id=>'protected-notes:'+id));
+			assert.deepEqual(await evaluate("return Object.keys(app.commands.commands).filter(id=>id.startsWith('1password-encrypt:')).sort();"),['configure-secret','encrypt-note','lock-all-notes','remove-protection'].map(id=>'1password-encrypt:'+id));
 			assert.deepEqual(await evaluate("return qaAvailableCommands();"),['configure-secret','encrypt-note']);
 			assert.equal(await evaluate("return qaWorkflowReads;"),0);
 			pass('four stable command IDs replace the individual Lock/Unlock commands without authorizing during checks');
-			await evaluate("app.commands.executeCommandById('protected-notes:encrypt-note');");
+			await evaluate("app.commands.executeCommandById('1password-encrypt:encrypt-note');");
 			await until("qaPlugin.views(qaWorkflowPath).length>0 && !qaPlugin.transitioning.has(qaWorkflowPath)");
 			if (await evaluate("return qaPlugin.prompts.size>0;")) {
 				assert.deepEqual(await evaluate("return qaAvailableCommands();"),['configure-secret','lock-all-notes','remove-protection']);
@@ -139,11 +139,11 @@ try {
 			await until("qaPlugin.coordinator.sessions.size===0 && qaPlugin.views(qaWorkflowPath).every(v=>v.getViewData()==='')");
 			pass('leaving the protected note automatically clears its other panes');
 			await evaluate("await qaWorkflowMain.openFile(app.vault.getAbstractFileByPath(qaWorkflowPath));");await click('Open with 1Password');await until("qaPlugin.views(qaWorkflowPath).every(v=>v.isUnlocked())");
-			await evaluate("app.commands.executeCommandById('protected-notes:lock-all-notes');");
+			await evaluate("app.commands.executeCommandById('1password-encrypt:lock-all-notes');");
 			await until("qaPlugin.coordinator.sessions.size===0 && qaPlugin.views(qaWorkflowPath).every(v=>v.getViewData()==='')");
 			pass('the single global privacy command clears readable content in every pane');
 			await evaluate("qaWorkflowPopout.detach();app.workspace.setActiveLeaf(qaWorkflowMain,{focus:true});qaPlugin.provider.resolve=()=>new Promise(resolve=>{globalThis.qaWorkflowFinish=resolve});void qaPlugin.unlockNote(qaWorkflowPath);");await click('Open with 1Password');
-			await until("typeof qaWorkflowFinish==='function'");await evaluate("app.commands.executeCommandById('protected-notes:lock-all-notes');qaWorkflowFinish('Synthetic workflow password');");
+			await until("typeof qaWorkflowFinish==='function'");await evaluate("app.commands.executeCommandById('1password-encrypt:lock-all-notes');qaWorkflowFinish('Synthetic workflow password');");
 			await until("qaPlugin.opening.size===0");
 			assert.equal(await evaluate("return !qaPlugin.coordinator.sessions.has(qaWorkflowPath) && !document.querySelector('.modal');"),true);
 			pass('global locking cancels pending authorization and ignores its late response');
@@ -152,9 +152,9 @@ try {
 			await evaluate("await app.workspace.getLeaf().openFile(app.vault.getAbstractFileByPath(qaWorkflowPath));");await click('Open with 1Password');await until("qaPlugin.coordinator.sessions.has(qaWorkflowPath)");
 			assert.equal(await evaluate("return qaPlugin.views(qaWorkflowPath)[0].getViewData().includes('QA_CLOSE_LAST_PANE') && !(await app.vault.read(app.vault.getAbstractFileByPath(qaWorkflowPath))).includes('QA_CLOSE_LAST_PANE');"),true);
 			pass('closing the last pane preserves its latest edit encrypted');
-			await evaluate("app.commands.executeCommandById('protected-notes:remove-protection');");await click('Cancel');
+			await evaluate("app.commands.executeCommandById('1password-encrypt:remove-protection');");await click('Cancel');
 			assert.equal(await evaluate("return (await app.vault.read(app.vault.getAbstractFileByPath(qaWorkflowPath))).startsWith('<protected-note');"),true);
-			await evaluate("app.commands.executeCommandById('protected-notes:remove-protection');");await click('Remove protection');await until("!qaPlugin.coordinator.sessions.has(qaWorkflowPath)");
+			await evaluate("app.commands.executeCommandById('1password-encrypt:remove-protection');");await click('Remove protection');await until("!qaPlugin.coordinator.sessions.has(qaWorkflowPath)");
 			assert.equal(await evaluate("return (await app.vault.read(app.vault.getAbstractFileByPath(qaWorkflowPath))).includes('QA_CLOSE_LAST_PANE');"),true);
 			pass('only explicit removal confirmation restores ordinary Markdown');
 		} finally {
@@ -163,7 +163,7 @@ try {
 		console.log(JSON.stringify({passed:passed.length,tests:passed},null,2));
 	}
 	else if (process.argv[2] === "live") {
-		await evaluate("globalThis.qaPlugin=app.plugins.plugins['protected-notes'];");
+		await evaluate("globalThis.qaPlugin=app.plugins.plugins['1password-encrypt'];");
 		await unlockLiveNote();
 		await until("qaPlugin.coordinator.sessions.has('1Password integration.md') && qaPlugin.views('1Password integration.md').some(v=>v.isUnlocked())");
 		pass("real 1Password secret unlocks the native editor");
@@ -181,7 +181,7 @@ try {
 		assert.equal(await evaluate("return document.querySelectorAll('.search-result-file-title').length;"),0);
 		assert.equal(await evaluate("return qaPlugin.coordinator.sessions.has('1Password integration.md');"),true);
 		pass("global content search does not find unlocked note contents");
-		await evaluate("await qaPlugin.lockNote('1Password integration.md');qaPlugin.settings={account:'',secretRef:''};await qaPlugin.saveData(qaPlugin.settings);await app.plugins.disablePlugin('protected-notes');await app.plugins.enablePlugin('protected-notes');globalThis.qaPlugin=app.plugins.plugins['protected-notes'];");
+		await evaluate("await qaPlugin.lockNote('1Password integration.md');qaPlugin.settings={account:'',secretRef:''};await qaPlugin.saveData(qaPlugin.settings);await app.plugins.disablePlugin('1password-encrypt');await app.plugins.enablePlugin('1password-encrypt');globalThis.qaPlugin=app.plugins.plugins['1password-encrypt'];");
 		await until("qaPlugin.views('1Password integration.md').length>0");
 		await unlockLiveNote();
 		await until("qaPlugin.views('1Password integration.md').some(v=>v.getViewData().includes(qaMarkers.body))");
@@ -200,7 +200,7 @@ try {
 	}
 	else {
 		await evaluate(`
-			globalThis.qaPlugin=app.plugins.plugins['protected-notes'];
+			globalThis.qaPlugin=app.plugins.plugins['1password-encrypt'];
 			globalThis.qaRealProvider=qaPlugin.provider;
 			globalThis.qaIdentity={account:'QA',secretRef:'op://abcdefghijklmnopqrstuvwxyz/abcdefghijklmnopqrstuvwxyz/password'};
 			qaPlugin.settings={...qaIdentity};

@@ -13,10 +13,14 @@ Windows/Linux require equivalent live validation before claiming support there.
 ## Install a local build
 
 Build with the development commands below, then copy `main.js`, `manifest.json`,
-and `styles.css` into `<vault>/.obsidian/plugins/protected-notes/`. Alternatively,
-extract the local `dist/protected-notes-0.1.0.zip` into the vault's plugins folder.
+and `styles.css` into `<vault>/.obsidian/plugins/1password-encrypt/`.
 Enable **1password Encrypt** under **Settings → Community plugins**, then set up
 1Password as described below. Begin with disposable notes.
+
+If upgrading a local `protected-notes` installation, close Obsidian and rename
+the plugin folder to `1password-encrypt`, keeping its `data.json` and `recovery/`
+contents. Re-enable the plugin after reopening Obsidian and reassign command
+hotkeys under the new plugin ID.
 
 ## Set up
 
@@ -92,8 +96,9 @@ Removing protection makes the note readable to search, sync, backups, and other
 plugins; it always requires confirmation.
 
 The individual **Lock current note** and **Unlock current note** commands have
-been removed, so their old hotkeys no longer work. Existing hotkeys for Protect
-(previously Encrypt), Remove protection, Lock all, and Setup retain their IDs.
+been removed, so their old hotkeys no longer work. The Protect
+(previously Encrypt), Remove protection, Lock all, and Setup commands retain their local
+command IDs; migrating from the old plugin ID requires reassigning hotkeys as above.
 
 ## Recovery and reinstalling
 

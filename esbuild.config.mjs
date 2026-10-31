@@ -31,7 +31,7 @@ const deployment = {
 	setup(build) {
 		build.onEnd(async ({ errors }) => {
 			if (errors.length) return;
-			const destination = process.env.OBSIDIAN_PLUGIN_DIR || (process.env.OBSIDIAN_VAULT_DIR && join(process.env.OBSIDIAN_VAULT_DIR, ".obsidian/plugins/protected-notes"));
+			const destination = process.env.OBSIDIAN_PLUGIN_DIR || (process.env.OBSIDIAN_VAULT_DIR && join(process.env.OBSIDIAN_VAULT_DIR, ".obsidian/plugins/1password-encrypt"));
 			if (!destination) return;
 			await mkdir(destination, { recursive: true });
 			await Promise.all(["main.js", "manifest.json", "styles.css"].map((file) => copyFile(file, join(destination, file))));
