@@ -5,11 +5,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      publish:
-        description: Publish a new plugin release
-        type: boolean
-        default: false
 permissions:
   contents: read
 concurrency:
@@ -17,9 +12,12 @@ concurrency:
   cancel-in-progress: false
 jobs:
   check:
+    name: Test and build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
@@ -27,14 +25,18 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
-      - run: npm run build
+      - run: env -u OBSIDIAN_PLUGIN_DIR -u OBSIDIAN_VAULT_DIR npm run build
       - run: node scripts/check-artifacts.mjs
+      - run: git diff --check
   release:
+    name: Publish release
     needs: check
-    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,6 +47,29 @@ jobs:
           node-version-file: .nvmrc
           package-manager-cache: false
       - run: npm ci
-      - run: npm run release
+      - name: Release
+        id: release
+        run: npm run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Attest published assets
+        if: steps.release.outputs.released == 'true'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
+          create-storage-record: false
+      - name: Verify published assets and attestations
+        if: steps.release.outputs.released == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          asset_dir="$RUNNER_TEMP/release-verification"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$asset_dir" --pattern main.js --pattern manifest.json --pattern styles.css
+          for asset in main.js manifest.json styles.css; do
+            cmp "$asset" "$asset_dir/$asset"
+            gh attestation verify "$asset_dir/$asset" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml"
+          done

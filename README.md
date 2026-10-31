@@ -199,9 +199,22 @@ automatic hiding, pending-request cancellation, and removal confirmation with a
 synthetic provider.
 
 CI runs lint, tests, build, and artifact checks on pushes and pull requests.
-Publishing is a separate manual action: run **CI and release** on `main` with
-**Publish a new plugin release** enabled. Semantic-release uses Conventional
-Commits, bare version tags, synchronized metadata, and the standard three release
-assets. An ordinary push does not publish a release.
+After checks pass on `main`, semantic-release automatically publishes a GitHub
+release when there are releasable Conventional Commits: `fix:` creates a patch,
+`feat:` creates a minor, and `feat!:` or a `BREAKING CHANGE:` footer creates a
+major release. Documentation, test, and CI-only commits do not create a release.
+Without a previous release tag, the first releasable history produces `1.0.0`.
+
+Release preparation updates the changelog, package/lockfile versions, manifest,
+and compatibility history, then builds and validates the standard three assets.
+Tags match the manifest version exactly, without a `v` prefix. The workflow
+attests the published assets, downloads them, and verifies their bytes and
+provenance. Release commits include `[skip ci]` to prevent a release loop.
+
+The workflow uses the built-in `GITHUB_TOKEN`; no npm publishing or extra token
+is needed. Pull requests only run checks. **CI and release** can also be run
+manually on `main` to retry publishing; it skips publication if no release is due.
+Use `npm run release:dry-run` with GitHub authentication to preview the next
+version without changing files, tags, or releases.
 
 See [FORMAT.md](FORMAT.md) for the recoverable v1 encryption format.
