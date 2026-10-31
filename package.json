@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-password-protected-notes",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"private": true,
 	"type": "module",
 	"description": "Encrypt Markdown notes with secrets stored in 1Password.",

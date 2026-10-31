@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/deepal/obsidian-password-protected-notes/compare/1.0.0...1.0.1) (2026-10-31)
+
+### Bug Fixes
+
+* rename plugin id to password-protected-notes ([1ec769f](https://github.com/deepal/obsidian-password-protected-notes/commit/1ec769f0ff09b1687ab50bdaf11802914b8486a4))
+
 ## 1.0.0 (2026-10-31)
 
 ### Features
