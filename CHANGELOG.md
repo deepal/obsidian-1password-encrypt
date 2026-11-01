@@ -1,3 +1,9 @@
+## [1.0.3](https://github.com/deepal/obsidian-password-protected-notes/compare/1.0.2...1.0.3) (2026-11-01)
+
+### Bug Fixes
+
+* bump plugin version to 1.0.3 ([f9c9093](https://github.com/deepal/obsidian-password-protected-notes/commit/f9c90933853ffefc124f4dbe304a2c4cee5c02fd))
+
 ## [1.0.2](https://github.com/deepal/obsidian-password-protected-notes/compare/1.0.1...1.0.2) (2026-11-01)
 
 ### Bug Fixes
