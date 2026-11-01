@@ -1,6 +1,7 @@
 export default {
 	branches: ["main"], tagFormat: "${version}",
 	plugins: [
+		// fix: commits trigger patch releases, including comment-only changes.
 		["@semantic-release/commit-analyzer", { preset: "conventionalcommits" }],
 		["@semantic-release/release-notes-generator", { preset: "conventionalcommits" }],
 		["@semantic-release/changelog", { changelogFile: "CHANGELOG.md" }],
