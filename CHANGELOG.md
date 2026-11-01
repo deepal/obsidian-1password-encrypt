@@ -1,3 +1,9 @@
+## [1.0.2](https://github.com/deepal/obsidian-password-protected-notes/compare/1.0.1...1.0.2) (2026-11-01)
+
+### Bug Fixes
+
+* trigger a patch release with a comment ([a62cf4e](https://github.com/deepal/obsidian-password-protected-notes/commit/a62cf4e756c87c6a19b18b52bcfd752692a02577))
+
 ## [1.0.1](https://github.com/deepal/obsidian-password-protected-notes/compare/1.0.0...1.0.1) (2026-10-31)
 
 ### Bug Fixes
